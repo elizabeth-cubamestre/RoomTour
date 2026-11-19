@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoomTruth</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{--bg:#f2f5f7;--ink:#14232b;--muted:#4d6370;--line:#c9d3d9;--sun:#f5a524;--water:#2b6f8f;--card:#fff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:1000px;margin:0 auto;padding:32px 20px}
+  h1{font-size:2rem;margin:0 0 4px;letter-spacing:-.02em}
+  .lede{color:var(--muted);margin:0 0 24px;max-width:60ch}
+  form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  label{position:absolute;left:-9999px}
+  input{flex:1 1 280px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
+  button{padding:12px 20px;border:0;border-radius:8px;background:var(--ink);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button:hover{background:var(--water)}
+  input:focus-visible,button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+  #status{min-height:1.5em;margin:0 0 12px;color:var(--muted)}
+  #status.error{color:#a4262c}
+  #map{height:420px;border:1px solid var(--line);border-radius:10px}
+</style>
+</head>
+<body>
+<main>
+  <h1>RoomTruth</h1>
+  <p class="lede">Listings show the best photo. Enter an address to see what the place is really like: sunlight, noise, flood risk, and commute.</p>
+  <form id="f">
+    <label for="addr">Apartment address</label>
+    <input id="addr" name="addr" placeholder="123 Main St, New Haven, CT" autocomplete="street-address" required minlength="5">
+    <button type="submit">Find address</button>
+  </form>
+  <p id="status" role="status" aria-live="polite"></p>
+  <div id="map" role="application" aria-label="Map of the apartment location"></div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([39.5, -98.35], 4);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+let marker = null;
+const status = document.getElementById('status');
+
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const address = document.getElementById('addr').value.trim();
+  status.className = ''; status.textContent = 'Looking up address...';
+  try {
+    const r = await fetch('/api/geocode?address=' + encodeURIComponent(address));
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Lookup failed');
+    if (marker) marker.remove();
+    marker = L.marker([data.lat, data.lon]).addTo(map).bindPopup(data.matched).openPopup();
+    map.setView([data.lat, data.lon], 17);
+    status.textContent = `Found: ${data.matched} (via ${data.source})`;
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = err.message;
+  }
+});
+</script>
+</body>
+</html>
